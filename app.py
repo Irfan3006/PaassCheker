@@ -2,13 +2,14 @@ from flask import Flask, render_template, request, jsonify
 import re
 import time
 from collections import defaultdict
+import hashlib
 import html
 import math
 import os
 
 app = Flask(__name__)
 
-# Use environment variable for secret key, with fallback for development
+
 app.secret_key = os.environ.get('FLASK_SECRET', 'dev-secret-key-change-in-production')
 
 rate_limit_store = defaultdict(list)
@@ -77,6 +78,7 @@ def estimate_crack_time(password):
     if check_common_password(password):
         return "Instantly", "0 seconds"
     
+
     if re.match(r'^\d+$', password):
         numeric_time = (10 ** len(password)) / 1000000000
         if numeric_time < 1:
@@ -92,47 +94,26 @@ def estimate_crack_time(password):
         else:
             return f"About {int(numeric_time/31536000)} years", f"{numeric_time:.2f} seconds"
     
-    if ' ' in password or re.search(r'[a-z]+\s+[a-z]+', password.lower()):
-        words = password.split()
-        if len(words) >= 2:
-            dict_time = (100000 ** len(words)) / 1000000000
-            if dict_time < 1:
-                return "Instantly", f"{dict_time:.6f} seconds"
-            elif dict_time < 60:
-                return f"About {int(numeric_time)} seconds", f"{numeric_time:.2f} seconds"
-            elif dict_time < 3600:
-                return f"About {int(numeric_time/60)} minutes", f"{numeric_time:.2f} seconds"
-            elif dict_time < 86400:
-                return f"About {int(numeric_time/3600)} hours", f"{numeric_time:.2f} seconds"
-            elif dict_time < 31536000:
-                return f"About {int(numeric_time/86400)} days", f"{numeric_time:.2f} seconds"
-            else:
-                return f"About {int(numeric_time/31536000)} years", f"{numeric_time:.2f} seconds"
-        else:
-            entropy = calculate_entropy(password)
-            dict_time = (2**entropy) / 1000000000
-            if dict_time < 1:
-                return "Instantly", f"{dict_time:.6f} seconds"
-            elif dict_time < 60:
-                return f"About {int(numeric_time)} seconds", f"{numeric_time:.2f} seconds"
-            elif dict_time < 3600:
-                return f"About {int(numeric_time/60)} minutes", f"{numeric_time:.2f} seconds"
-            elif dict_time < 86400:
-                return f"About {int(numeric_time/3600)} hours", f"{numeric_time:.2f} seconds"
-            elif dict_time < 31536000:
-                return f"About {int(numeric_time/86400)} days", f"{numeric_time:.2f} seconds"
-            else:
-                return f"About {int(numeric_time/31536000)} years", f"{numeric_time:.2f} seconds"
-    
+
+
     entropy = calculate_entropy(password)
     pattern_score = calculate_pattern_score(password)
     
+
     adjusted_entropy = max(entropy + pattern_score, 0)
     
-    attack_rate = 1000000000
+
+
+    attack_rate = 1000000000  # 1 billion guesses per second for offline attacks
     
-    time_seconds = (2**adjusted_entropy) / attack_rate
+
+    try:
+        time_seconds = (2**adjusted_entropy) / attack_rate
+    except (OverflowError, ValueError):
+
+        return "Centuries", "Too long to calculate"
     
+
     def format_time(seconds):
         if seconds < 1:
             return "Instantly", f"{seconds:.6f} seconds"
@@ -167,9 +148,11 @@ def calculate_password_score(password):
     reasons = []
     tips = []
     
+
     if check_common_password(password):
         return 0, "Very Weak", ["This password is in the list of commonly used passwords - avoid using it"], True, ["Common password"], "Instantly"
     
+
     length = len(password)
     if length < 4:
         score += 0
@@ -186,6 +169,7 @@ def calculate_password_score(password):
     else:
         score += 30
     
+
     has_lower = bool(re.search(r'[a-z]', password))
     has_upper = bool(re.search(r'[A-Z]', password))
     has_digit = bool(re.search(r'\d', password))
@@ -207,6 +191,7 @@ def calculate_password_score(password):
         reasons.append("No special characters")
         tips.append("Include special characters (!@#$%^*)")
     
+
     sequential_patterns = [
         '123456789',
         '987654321',
@@ -225,11 +210,13 @@ def calculate_password_score(password):
             tips.append("Avoid sequential patterns like '1234' or 'abcd'")
             break
     
+
     if re.search(r'(.)\1{2,}', password):
         score -= 5
         reasons.append("Repeated characters")
         tips.append("Avoid repeating the same character multiple times")
     
+
     common_words = ['password', 'admin', 'user', 'login', 'welcome', 'hello', 'test']
     for word in common_words:
         if word in password_lower and len(password) < 10:
@@ -238,8 +225,10 @@ def calculate_password_score(password):
             tips.append(f"Avoid using common words like '{word}'")
             break
     
+
     score = max(0, min(100, score))
     
+
     if score >= 80:
         strength = "Very Strong"
     elif score >= 60:
@@ -251,17 +240,20 @@ def calculate_password_score(password):
     else:
         strength = "Very Weak"
     
+
     tips = tips[:3]
     
+
     crack_time, raw_time = estimate_crack_time(password)
     
     return score, strength, tips, False, reasons, crack_time
 
 def rate_limit_check(ip):
     now = time.time()
+
     rate_limit_store[ip] = [req_time for req_time in rate_limit_store[ip] if now - req_time < 60]
     
-    if len(rate_limit_store[ip]) >= 10:
+    if len(rate_limit_store[ip]) >= 10:  # 10 requests per minute
         return True
     
     rate_limit_store[ip].append(now)
@@ -273,6 +265,7 @@ def index():
 
 @app.route('/check', methods=['POST'])
 def check_password():
+
     if rate_limit_check(request.remote_addr):
         return jsonify({
             'error': 'Rate limit exceeded. Please try again later.',
@@ -284,6 +277,7 @@ def check_password():
             'crack_time': 'N/A'
         }), 429
     
+
     password = None
     if request.is_json:
         data = request.get_json()
@@ -291,22 +285,38 @@ def check_password():
     else:
         password = request.form.get('password', '')
     
+
     password = sanitize_input(password)
     
-    score, strength, tips, is_common, reasons, crack_time = calculate_password_score(password)
-    
-    escaped_tips = [html.escape(tip, quote=False) for tip in tips]
-    
-    return jsonify({
-        'score': score,
-        'strength': strength,
-        'tips': escaped_tips,
-        'is_common': is_common,
-        'reasons': reasons,
-        'crack_time': crack_time
-    })
+    try:
 
-# For Vercel deployment
+        score, strength, tips, is_common, reasons, crack_time = calculate_password_score(password)
+        
+
+        escaped_tips = [html.escape(tip, quote=False) for tip in tips]
+        
+        return jsonify({
+            'score': score,
+            'strength': strength,
+            'tips': escaped_tips,
+            'is_common': is_common,
+            'reasons': reasons,
+            'crack_time': crack_time
+        })
+    except Exception as e:
+
+        print(f"Error processing password: {str(e)}")
+        return jsonify({
+            'error': 'An error occurred while processing your password. Please try again.',
+            'score': 0,
+            'strength': 'Error',
+            'tips': ['An error occurred. Please try again.'],
+            'is_common': False,
+            'reasons': ['Processing error'],
+            'crack_time': 'N/A'
+        }), 500
+
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port)
