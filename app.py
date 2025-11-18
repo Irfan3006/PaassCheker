@@ -6,7 +6,7 @@ import html
 import math
 import os
 
-app = Flask(__name__, template_folder="templates", public_folder="public")
+app = Flask(__name__, template_folder="templates", static_folder="public")
 
 app.secret_key = os.environ.get('FLASK_SECRET')
 if not app.secret_key and os.environ.get('FLASK_ENV') != 'development':
