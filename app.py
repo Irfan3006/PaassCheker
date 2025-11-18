@@ -205,7 +205,7 @@ def calculate_password_score(password):
         tips.append("Include numbers (0-9)")
     if not has_symbol:
         reasons.append("No special characters")
-        tips.append("Include special characters (!@#$%^&*)")
+        tips.append("Include special characters (!@#$%^*)")
     
     sequential_patterns = [
         '123456789',
