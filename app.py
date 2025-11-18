@@ -6,11 +6,10 @@ import html
 import math
 import os
 
-app = Flask(__name__, template_folder="public", static_folder="public")
+app = Flask(__name__)
 
-app.secret_key = os.environ.get('FLASK_SECRET')
-if not app.secret_key and os.environ.get('FLASK_ENV') != 'development':
-    raise RuntimeError("FLASK_SECRET is required in production")
+# Use environment variable for secret key, with fallback for development
+app.secret_key = os.environ.get('FLASK_SECRET', 'dev-secret-key-change-in-production')
 
 rate_limit_store = defaultdict(list)
 
@@ -100,30 +99,30 @@ def estimate_crack_time(password):
             if dict_time < 1:
                 return "Instantly", f"{dict_time:.6f} seconds"
             elif dict_time < 60:
-                return f"About {int(dict_time)} seconds", f"{dict_time:.2f} seconds"
+                return f"About {int(numeric_time)} seconds", f"{numeric_time:.2f} seconds"
             elif dict_time < 3600:
-                return f"About {int(dict_time/60)} minutes", f"{dict_time:.2f} seconds"
+                return f"About {int(numeric_time/60)} minutes", f"{numeric_time:.2f} seconds"
             elif dict_time < 86400:
-                return f"About {int(dict_time/3600)} hours", f"{dict_time:.2f} seconds"
+                return f"About {int(numeric_time/3600)} hours", f"{numeric_time:.2f} seconds"
             elif dict_time < 31536000:
-                return f"About {int(dict_time/86400)} days", f"{dict_time:.2f} seconds"
+                return f"About {int(numeric_time/86400)} days", f"{numeric_time:.2f} seconds"
             else:
-                return f"About {int(dict_time/31536000)} years", f"{dict_time:.2f} seconds"
+                return f"About {int(numeric_time/31536000)} years", f"{numeric_time:.2f} seconds"
         else:
             entropy = calculate_entropy(password)
             dict_time = (2**entropy) / 1000000000
             if dict_time < 1:
                 return "Instantly", f"{dict_time:.6f} seconds"
             elif dict_time < 60:
-                return f"About {int(dict_time)} seconds", f"{dict_time:.2f} seconds"
+                return f"About {int(numeric_time)} seconds", f"{numeric_time:.2f} seconds"
             elif dict_time < 3600:
-                return f"About {int(dict_time/60)} minutes", f"{dict_time:.2f} seconds"
+                return f"About {int(numeric_time/60)} minutes", f"{numeric_time:.2f} seconds"
             elif dict_time < 86400:
-                return f"About {int(dict_time/3600)} hours", f"{dict_time:.2f} seconds"
+                return f"About {int(numeric_time/3600)} hours", f"{numeric_time:.2f} seconds"
             elif dict_time < 31536000:
-                return f"About {int(dict_time/86400)} days", f"{dict_time:.2f} seconds"
+                return f"About {int(numeric_time/86400)} days", f"{numeric_time:.2f} seconds"
             else:
-                return f"About {int(dict_time/31536000)} years", f"{dict_time:.2f} seconds"
+                return f"About {int(numeric_time/31536000)} years", f"{numeric_time:.2f} seconds"
     
     entropy = calculate_entropy(password)
     pattern_score = calculate_pattern_score(password)
@@ -206,7 +205,7 @@ def calculate_password_score(password):
         tips.append("Include numbers (0-9)")
     if not has_symbol:
         reasons.append("No special characters")
-        tips.append("Include special characters (!@#$%^*)")
+        tips.append("Include special characters (!@#$%^&*)")
     
     sequential_patterns = [
         '123456789',
@@ -307,6 +306,7 @@ def check_password():
         'crack_time': crack_time
     })
 
+# For Vercel deployment
 if __name__ == '__main__':
-    debug = os.environ.get("FLASK_DEBUG", "false").lower() in ("1","true","yes")
-    app.run(debug=debug, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
