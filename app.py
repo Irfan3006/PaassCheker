@@ -6,9 +6,11 @@ import html
 import math
 import os
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder="templates", static_folder="static")
 
-app.secret_key = os.environ.get('FLASK_SECRET', 'dev-secret-key-change-in-production')
+app.secret_key = os.environ.get('FLASK_SECRET')
+if not app.secret_key and os.environ.get('FLASK_ENV') != 'development':
+    raise RuntimeError("FLASK_SECRET is required in production")
 
 rate_limit_store = defaultdict(list)
 
@@ -305,6 +307,6 @@ def check_password():
         'crack_time': crack_time
     })
 
-DEBUG = os.environ.get('FLASK_DEBUG', 'false').lower() in ('1', 'true', 'yes')
 if __name__ == '__main__':
-    app.run(debug=DEBUG)  
+    debug = os.environ.get("FLASK_DEBUG", "false").lower() in ("1","true","yes")
+    app.run(debug=debug, host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
