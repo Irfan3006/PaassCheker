@@ -2,15 +2,17 @@ from flask import Flask, render_template, request, jsonify
 import re
 import time
 from collections import defaultdict
-import hashlib
 import html
 import math
 import os
 
 app = Flask(__name__)
 
-
-app.secret_key = os.environ.get('FLASK_SECRET', 'dev-secret-key-change-in-production')
+app.config['SESSION_COOKIE_SAMESITE'] = 'Strict'  
+app.config['SESSION_COOKIE_SECURE'] = True        
+app.config['SESSION_COOKIE_HTTPONLY'] = True      
+app.config['SESSION_COOKIE_NAME'] = '__Secure-Session'
+app.secret_key = os.environ.get('FLASK_SECRET', 'xxxxxxx')
 
 rate_limit_store = defaultdict(list)
 
